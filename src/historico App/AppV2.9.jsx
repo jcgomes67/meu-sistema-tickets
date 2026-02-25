@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { 
   PlusCircle, Search, X, Calendar, Edit3, Save, Trash2, 
   ArrowUpDown, UserCheck, User, Clock, ChevronDown, ChevronUp,
-  EyeOff, Eye, Download, FileText, Layers, Hash
+  EyeOff, Eye, Download, FileText
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -12,9 +12,6 @@ const TEAM_EMAILS = [
   "jcgomes@salesgroup.pt", "cmendes@salesgroup.pt", "cchau@salesgroup.pt", 
   "vsilva@salesgrouop.pt", "pbacalhau@salesgroup.pt"
 ];
-
-// --- OPÇÕES DE SETOR ---
-const SECTORS = ["ASP","Comercial", "DAF","Data Sales","Segurança e Compliance", "Pessoal", "Outros"];
 
 export default function App() {
   const [tickets, setTickets] = useState([]); 
@@ -26,8 +23,6 @@ export default function App() {
   const [showHidden, setShowHidden] = useState(false);
   
   const [columnFilters, setColumnFilters] = useState({
-    id: '', // Novo filtro ID
-    type: '',
     subject: '',
     priority: '',
     status: '',
@@ -63,7 +58,6 @@ export default function App() {
   const getPriorityColor = (prio) => {
     switch (prio) {
       case 'Crítica': return 'text-red-600 bg-red-100';
-      case 'Média': return 'text-yellow-600 bg-yellow-100';
       case 'Alta': return 'text-orange-600 bg-orange-100';
       default: return 'text-blue-600 bg-blue-100';
     }
@@ -103,6 +97,7 @@ export default function App() {
     if (!error) fetchTickets();
   };
 
+  // --- FUNÇÃO APAGAR REGISTO ---
   const handleDeleteTicket = async (id) => {
     if (window.confirm("Tem a certeza que deseja eliminar permanentemente este registo?")) {
       const { error } = await supabase.from('tickets').delete().eq('id', id);
@@ -113,7 +108,7 @@ export default function App() {
 
   const exportToExcel = () => {
     const dataToExport = filteredTickets.map(t => ({
-      ID: t.id, Setor: t.type, Tarefa: t.subject, Prioridade: t.priority, Status: t.status,
+      ID: t.id, Tarefa: t.subject, Prioridade: t.priority, Status: t.status,
       Executor: t.assignedTo, Solicitante: t.userEmail, Criado: t.createdOn, Conclusao: t.endDate
     }));
     const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -132,10 +127,8 @@ export default function App() {
     if (!showHidden) result = result.filter(t => !t.hidden);
     if (searchTerm) {
       result = result.filter(t => 
-        t.id?.toString().includes(searchTerm) ||
         t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.type?.toLowerCase().includes(searchTerm.toLowerCase())
+        t.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     Object.keys(columnFilters).forEach(key => {
@@ -155,15 +148,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900 text-left">
-      {/* HEADER */}
-      <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* HEADER ATUALIZADO */}
+      <div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center" style={{ width: '190px' }}>
             <img src="/logo.png" alt="Logo" className="max-w-full h-auto" />
           </div>
           <div>
             <h1 className="text-3xl font-bold">Gestão de Pendentes</h1>
-            <p className="text-grey-600 font-normal text-sm tracking-wider">Tarefas: João Costa Gomes</p>
+            <p className="text-gray-600 font-bold text-sm uppercase tracking-wider">Tarefas: João Costa Gomes</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -173,10 +166,10 @@ export default function App() {
       </div>
 
       {/* FERRAMENTAS DE VISUALIZAÇÃO */}
-      <div className="max-w-7xl mx-auto mb-6 flex items-center justify-between gap-4">
+      <div className="max-w-6xl mx-auto mb-6 flex items-center justify-between gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="Pesquisar ID, Tarefa, Setor..." className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" onChange={(e) => setSearchTerm(e.target.value)} />
+          <input type="text" placeholder="Pesquisar..." className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
         <button onClick={() => setShowHidden(!showHidden)} className="bg-white border px-4 py-3 rounded-xl text-xs font-bold text-gray-600 flex items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm">
           {showHidden ? <Eye size={16}/> : <EyeOff size={16}/>} {showHidden ? "Ocultar Arquivados" : "Ver Arquivados"}
@@ -184,39 +177,30 @@ export default function App() {
       </div>
 
       {/* TABELA PRINCIPAL */}
-      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50/50 border-b">
               <tr>
-                {/* COLUNA ID */}
-                <th className="p-4 w-20">
-                  <div onClick={() => requestSort('id')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2 hover:text-blue-600">ID <ArrowUpDown size={12}/></div>
-                  <input type="text" placeholder="#" className="w-full p-1 text-xs border rounded outline-none" onChange={e => setColumnFilters({...columnFilters, id: e.target.value})} />
+                <th className="p-4">
+                  <div onClick={() => requestSort('subject')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2">Tarefa <ArrowUpDown size={12}/></div>
+                  <input type="text" placeholder="Filtrar..." className="w-full p-1 text-xs border rounded" onChange={e => setColumnFilters({...columnFilters, subject: e.target.value})} />
                 </th>
-                {/* COLUNA SETOR */}
-                <th className="p-4 w-40">
-                  <div onClick={() => requestSort('type')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2 hover:text-blue-600">Setor <ArrowUpDown size={12}/></div>
-                  <select className="w-full p-1 text-xs border rounded outline-none" onChange={e => setColumnFilters({...columnFilters, type: e.target.value})}>
-                    <option value="">Todos</option>
-                    {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                <th className="p-4 w-32">
+                  <div onClick={() => requestSort('priority')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2">Prio <ArrowUpDown size={12}/></div>
+                  <select className="w-full p-1 text-xs border rounded" onChange={e => setColumnFilters({...columnFilters, priority: e.target.value})}>
+                    <option value="">Todas</option><option>Baixa</option><option>Alta</option><option>Crítica</option>
+                  </select>
+                </th>
+                <th className="p-4 w-40 text-center">
+                  <div onClick={() => requestSort('status')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center justify-center gap-1 mb-2">Status <ArrowUpDown size={12}/></div>
+                  <select className="w-full p-1 text-xs border rounded" onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}>
+                    <option value="">Todos</option><option>Aberto</option><option>Resolvido</option>
                   </select>
                 </th>
                 <th className="p-4">
-                  <div onClick={() => requestSort('subject')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2 hover:text-blue-600">Tarefa <ArrowUpDown size={12}/></div>
-                  <input type="text" placeholder="Filtrar..." className="w-full p-1 text-xs border rounded outline-none focus:border-blue-400" onChange={e => setColumnFilters({...columnFilters, subject: e.target.value})} />
-                </th>
-                <th className="p-4 w-28 text-center">
-                  <div onClick={() => requestSort('priority')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center justify-center gap-1 mb-2 hover:text-blue-600">Prio <ArrowUpDown size={12}/></div>
-                  <select className="w-full p-1 text-xs border rounded outline-none" onChange={e => setColumnFilters({...columnFilters, priority: e.target.value})}>
-                    <option value="">Todas</option><option>Baixa</option><option>Média</option><option>Alta</option><option>Crítica</option>
-                  </select>
-                </th>
-                <th className="p-4 w-32 text-center">
-                  <div onClick={() => requestSort('status')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center justify-center gap-1 mb-2 hover:text-blue-600">Status <ArrowUpDown size={12}/></div>
-                  <select className="w-full p-1 text-xs border rounded outline-none" onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}>
-                    <option value="">Todos</option><option>Aberto</option><option>Resolvido</option>
-                  </select>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase mb-2">Executor</div>
+                  <input type="text" placeholder="Filtrar..." className="w-full p-1 text-xs border rounded" onChange={e => setColumnFilters({...columnFilters, assignedTo: e.target.value})} />
                 </th>
                 <th className="p-4 text-right text-[10px] font-bold text-gray-400 uppercase">Ações</th>
               </tr>
@@ -225,22 +209,11 @@ export default function App() {
               {filteredTickets.map((ticket) => (
                 <React.Fragment key={ticket.id}>
                   <tr className={`transition-colors ${ticket.hidden ? 'opacity-50 grayscale bg-gray-50' : ''} ${expandedRow === ticket.id ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}>
-                    {/* VALOR ID */}
-                    <td className="p-4 text-xs font-mono font-bold text-gray-400">
-                      #{ticket.id}
-                    </td>
-                    {/* VALOR SETOR */}
-                    <td className="p-4 text-xs font-bold text-gray-500 uppercase tracking-tighter">
-                      <div className="flex items-center gap-1.5">
-                        <Layers size={12} className="text-gray-300"/>
-                        {ticket.type}
-                      </div>
-                    </td>
                     <td className="p-4">
                       <div className="font-bold text-gray-800">{ticket.subject}</div>
-                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Criado: {ticket.createdOn} | Executor: {ticket.assignedTo?.split('@')[0]}</div>
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Criado em: {ticket.createdOn}</div>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-4">
                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
                         {ticket.priority}
                       </span>
@@ -250,6 +223,7 @@ export default function App() {
                         {ticket.status}
                       </button>
                     </td>
+                    <td className="p-4 text-xs font-medium text-blue-600">{ticket.assignedTo?.split('@')[0]}</td>
                     <td className="p-4 text-right space-x-1 whitespace-nowrap">
                       <button onClick={() => toggleHideTicket(ticket.id, ticket.hidden)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400">
                         {ticket.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -266,15 +240,15 @@ export default function App() {
                     </td>
                   </tr>
                   
-                  {/* EXPANSÃO DETALHADA */}
+                  {/* VISUALIZAÇÃO DO DETALHE (EXPANSÃO) */}
                   {expandedRow === ticket.id && (
                     <tr className="bg-gray-50/80">
-                      <td colSpan="6" className="p-6">
+                      <td colSpan="5" className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                           <div className="md:col-span-2">
                             <h4 className="flex items-center gap-2 font-bold text-gray-400 uppercase text-[10px] mb-3"><FileText size={14}/> Descrição Detalhada</h4>
                             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-gray-700 leading-relaxed min-h-[100px]">
-                              {ticket.description || 'Sem descrição registada.'}
+                              {ticket.description || 'Sem descrição registada para esta tarefa.'}
                             </div>
                           </div>
                           <div className="space-y-4">
@@ -282,8 +256,9 @@ export default function App() {
                               <h4 className="font-bold text-gray-400 uppercase text-[10px] border-b pb-2">Informação Geral</h4>
                               <p className="flex items-center gap-2 text-xs text-gray-600"><User size={14} className="text-gray-400"/> <b>Solicitante:</b> {ticket.userEmail}</p>
                               <p className="flex items-center gap-2 text-xs text-blue-700 font-bold"><UserCheck size={14} className="text-blue-500"/> <b>Executor:</b> {ticket.assignedTo}</p>
-                              <p className="flex items-center gap-2 text-xs text-gray-600"><Clock size={14} className="text-gray-400"/> <b>Conclusão:</b> {ticket.endDate || 'N/A'}</p>
+                              <p className="flex items-center gap-2 text-xs text-gray-600"><Clock size={14} className="text-gray-400"/> <b>Conclusão:</b> {ticket.endDate || 'Sem data'}</p>
                             </div>
+                            <div className="text-[10px] text-gray-400 px-2 font-medium">Ticket ID: #{ticket.id}</div>
                           </div>
                         </div>
                       </td>
@@ -332,13 +307,13 @@ export default function App() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Setor</label>
                   <select name="type" defaultValue={editingTicket?.type} className="w-full bg-gray-50 border rounded-xl p-3 text-sm">
-                    {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                    <option>Segurança e Compliance</option><option>Comercial</option><option>ASP</option><option>Data Sales</option><option>DAF</option><option>Pessoal</option>
                   </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Prioridade</label>
                   <select name="priority" defaultValue={editingTicket?.priority} className="w-full bg-gray-50 border rounded-xl p-3 text-sm">
-                    <option>Baixa</option><option>Média</option><option>Alta</option><option>Crítica</option>
+                    <option>Baixa</option><option>Alta</option><option>Crítica</option>
                   </select>
                 </div>
               </div>
