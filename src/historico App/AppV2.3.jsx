@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { 
   PlusCircle, Search, X, Send, Calendar, Tag, 
   AlertCircle, CheckCircle2, Clock, ChevronDown, 
-  ChevronUp, Edit3, Save, Trash2 
+  ChevronUp, Edit3, Save 
 } from 'lucide-react';
 
 export default function App() {
@@ -11,8 +11,8 @@ export default function App() {
   const [tickets, setTickets] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTicket, setEditingTicket] = useState(null);
-  const [expandedRow, setExpandedRow] = useState(null);
+  const [editingTicket, setEditingTicket] = useState(null); // Estado para edição
+  const [expandedRow, setExpandedRow] = useState(null); // Estado para a segunda linha
   const [searchTerm, setSearchTerm] = useState('');
 
   // --- LEITURA (FETCH) ---
@@ -47,23 +47,6 @@ export default function App() {
 
   useEffect(() => { fetchTickets(); }, []);
 
-  // --- NOVA FUNÇÃO: APAGAR TAREFA (DELETE) ---
-  const handleDeleteTicket = async (id) => {
-    if (window.confirm("Deseja eliminar esta tarefa permanentemente?")) {
-      const { error } = await supabase
-        .from('tickets')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        alert("Erro ao eliminar: " + error.message);
-      } else {
-        // Remove da lista local instantaneamente
-        setTickets(tickets.filter(t => t.id !== id));
-      }
-    }
-  };
-
   // --- CRIAR OU EDITAR (UPSERT) ---
   const handleSaveTicket = async (e) => {
     e.preventDefault();
@@ -82,9 +65,11 @@ export default function App() {
 
     let error;
     if (editingTicket) {
+      // ATUALIZAR
       const result = await supabase.from('tickets').update(ticketData).eq('id', editingTicket.id);
       error = result.error;
     } else {
+      // INSERT NOVO
       const result = await supabase.from('tickets').insert([ticketData]);
       error = result.error;
     }
@@ -120,23 +105,30 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900">
       {/* HEADER */}
-      <div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center" style={{ width: '190px' }}>
-            <img src="/logo.png" alt="Logo Sales Group" className="max-w-full h-auto" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestão de Pendentes</h1>
-            <p className="text-gray-500 font-medium">Tarefas: João Costa Gomes</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => { setEditingTicket(null); setIsModalOpen(true); }}
-          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95"
-        >
-          <PlusCircle size={20} /> Novo Ticket
-        </button>
-      </div>
+<div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+  <div className="flex items-center gap-6">
+    {/* LOGOTIPO - Ajustado para ~5cm de largura */}
+    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center" style={{ width: '190px' }}>
+      <img 
+        src="/logo.png" 
+        alt="Logo Sales Group" 
+        className="max-w-full h-auto"
+      />
+    </div>
+    
+    <div>
+      <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestão de Pendentes</h1>
+      <p className="text-gray-500 font-medium">Tarefas: João Costa Gomes</p>
+    </div>
+  </div>
+
+  <button 
+    onClick={() => { setEditingTicket(null); setIsModalOpen(true); }}
+    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95"
+  >
+    <PlusCircle size={20} /> Novo Ticket
+  </button>
+</div>
 
       {/* LISTA */}
       <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -153,6 +145,7 @@ export default function App() {
             <tbody className="divide-y divide-gray-100">
               {filteredTickets.map((ticket) => (
                 <React.Fragment key={ticket.id}>
+                  {/* LINHA PRINCIPAL */}
                   <tr className={`transition-colors ${expandedRow === ticket.id ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}>
                     <td className="p-4">
                       <div className="font-bold text-gray-800">{ticket.subject}</div>
@@ -169,19 +162,16 @@ export default function App() {
                       </button>
                     </td>
                     <td className="p-4 text-right space-x-2">
-                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500">
                         {expandedRow === ticket.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </button>
-                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors">
+                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600">
                         <Edit3 size={18} />
-                      </button>
-                      {/* BOTÃO DE APAGAR */}
-                      <button onClick={() => handleDeleteTicket(ticket.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors">
-                        <Trash2 size={18} />
                       </button>
                     </td>
                   </tr>
 
+                  {/* SEGUNDA LINHA (EXPANDIDA) */}
                   {expandedRow === ticket.id && (
                     <tr className="bg-gray-50/80">
                       <td colSpan="4" className="p-6 text-sm">
@@ -212,7 +202,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* MODAL (CRIAÇÃO E EDIÇÃO) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-8 animate-in zoom-in duration-200">
@@ -235,7 +225,7 @@ export default function App() {
                 <input name="endDate" type="date" defaultValue={editingTicket?.endDate} className="bg-gray-50 border rounded-xl p-3 text-sm" />
                 <input name="userEmail" type="email" defaultValue={editingTicket?.userEmail} className="bg-gray-50 border rounded-xl p-3 text-sm" placeholder="Email do requerente" />
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2">
                 <Save size={20} /> {editingTicket ? 'Guardar Alterações' : 'Criar Ticket'}
               </button>
             </form>
