@@ -105,30 +105,18 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900">
       {/* HEADER */}
-<div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-  <div className="flex items-center gap-6">
-    {/* LOGOTIPO - Ajustado para ~5cm de largura */}
-    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center" style={{ width: '190px' }}>
-      <img 
-        src="/logo.png" 
-        alt="Logo Sales Group" 
-        className="max-w-full h-auto"
-      />
-    </div>
-    
-    <div>
-      <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestão de Pendentes</h1>
-      <p className="text-gray-500 font-medium">Tarefas: João Costa Gomes</p>
-    </div>
-  </div>
-
-  <button 
-    onClick={() => { setEditingTicket(null); setIsModalOpen(true); }}
-    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95"
-  >
-    <PlusCircle size={20} /> Novo Ticket
-  </button>
-</div>
+      <div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Gestão de Pendentes</h1>
+          <p className="text-gray-500">Task List: João Costa Gomess</p>
+        </div>
+        <button 
+          onClick={() => { setEditingTicket(null); setIsModalOpen(true); }}
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg"
+        >
+          <PlusCircle size={20} /> Nova Tarefa
+        </button>
+      </div>
 
       {/* LISTA */}
       <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
