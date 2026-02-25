@@ -1,29 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient'; 
 import { 
-  PlusCircle, Search, X, Send, Calendar, Tag, 
-  AlertCircle, CheckCircle2, Clock, ChevronDown, 
-  ChevronUp, Edit3, Save, Trash2 
+  PlusCircle, Search, X, Calendar, Edit3, Save, Trash2, 
+  ArrowUpDown, UserCheck, User, Clock, ChevronDown, ChevronUp 
 } from 'lucide-react';
 
+// --- CONFIGURAÇÃO DA EQUIPA ---
+const TEAM_EMAILS = [
+  "jcgomes@salesgroup.pt",
+  "cmendes@salesgroup.pt",
+  "cchau@salesgroup.pt",
+  "vsilva@salesgrouop.pt",
+  "pbacalhau@salesgroup.pt"
+];
+
 export default function App() {
-  // --- ESTADOS ---
   const [tickets, setTickets] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // --- ESTADO DE ORDENAÇÃO ---
+  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
 
-  // --- LEITURA (FETCH) ---
   const fetchTickets = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('tickets')
-        .select('*')
-        .order('id', { ascending: false });
-
+      const { data, error } = await supabase.from('tickets').select('*');
       if (error) throw error;
 
       const ticketsFormatados = data.map(t => ({
@@ -35,11 +40,12 @@ export default function App() {
         status: t.Status,
         endDate: t["End Date"],
         createdOn: t["Created On"],
-        userEmail: t["User Email"]
+        userEmail: t["User Email"],
+        assignedTo: t["Assigned To"]
       }));
       setTickets(ticketsFormatados);
     } catch (error) {
-      console.error('Erro ao carregar:', error.message);
+      console.error('Erro:', error.message);
     } finally {
       setLoading(false);
     }
@@ -47,28 +53,47 @@ export default function App() {
 
   useEffect(() => { fetchTickets(); }, []);
 
-  // --- NOVA FUNÇÃO: APAGAR TAREFA (DELETE) ---
-  const handleDeleteTicket = async (id) => {
-    if (window.confirm("Deseja eliminar esta tarefa permanentemente?")) {
-      const { error } = await supabase
-        .from('tickets')
-        .delete()
-        .eq('id', id);
+  // --- LÓGICA DE ORDENAÇÃO ---
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
-      if (error) {
-        alert("Erro ao eliminar: " + error.message);
-      } else {
-        // Remove da lista local instantaneamente
-        setTickets(tickets.filter(t => t.id !== id));
-      }
+  const sortedTickets = useMemo(() => {
+    let sortableItems = [...tickets];
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [tickets, sortConfig]);
+
+  const filteredTickets = sortedTickets.filter(t => 
+    t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleDeleteTicket = async (id) => {
+    if (window.confirm("Deseja eliminar esta tarefa?")) {
+      const { error } = await supabase.from('tickets').delete().eq('id', id);
+      if (error) alert(error.message);
+      else setTickets(tickets.filter(t => t.id !== id));
     }
   };
 
-  // --- CRIAR OU EDITAR (UPSERT) ---
   const handleSaveTicket = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    
     const ticketData = {
       "Title": formData.get('subject'),
       "Description": formData.get('description'),
@@ -76,35 +101,23 @@ export default function App() {
       "Type": formData.get('type'),
       "End Date": formData.get('endDate'),
       "User Email": formData.get('userEmail'),
+      "Assigned To": formData.get('assignedTo'),
       "Status": editingTicket ? editingTicket.status : 'Aberto',
       "Created On": editingTicket ? editingTicket.createdOn : new Date().toISOString().split('T')[0]
     };
 
-    let error;
-    if (editingTicket) {
-      const result = await supabase.from('tickets').update(ticketData).eq('id', editingTicket.id);
-      error = result.error;
-    } else {
-      const result = await supabase.from('tickets').insert([ticketData]);
-      error = result.error;
-    }
+    const { error } = editingTicket 
+      ? await supabase.from('tickets').update(ticketData).eq('id', editingTicket.id)
+      : await supabase.from('tickets').insert([ticketData]);
 
-    if (error) {
-      alert("Erro ao gravar: " + error.message);
-    } else {
-      setIsModalOpen(false);
-      setEditingTicket(null);
-      fetchTickets();
-    }
+    if (error) alert(error.message);
+    else { setIsModalOpen(false); setEditingTicket(null); fetchTickets(); }
   };
 
-  // --- ALTERNAR STATUS RÁPIDO ---
   const toggleStatus = async (id, currentStatus) => {
     const nextStatus = currentStatus === 'Aberto' ? 'Resolvido' : 'Aberto';
-    const { error } = await supabase.from('tickets').update({ Status: nextStatus }).eq('id', id);
-    if (!error) {
-      setTickets(tickets.map(t => t.id === id ? { ...t, status: nextStatus } : t));
-    }
+    await supabase.from('tickets').update({ Status: nextStatus }).eq('id', id);
+    setTickets(tickets.map(t => t.id === id ? { ...t, status: nextStatus } : t));
   };
 
   const getPriorityColor = (prio) => {
@@ -114,8 +127,6 @@ export default function App() {
       default: return 'text-blue-600 bg-blue-100';
     }
   };
-
-  const filteredTickets = tickets.filter(t => t.subject?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900">
@@ -127,15 +138,18 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestão de Pendentes</h1>
-            <p className="text-gray-500 font-medium">Tarefas: João Costa Gomes</p>
+            <p className="text-gray-500 font-medium font-xs">Sales Group Task Manager</p>
           </div>
         </div>
-        <button 
-          onClick={() => { setEditingTicket(null); setIsModalOpen(true); }}
-          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95"
-        >
-          <PlusCircle size={20} /> Novo Ticket
+        <button onClick={() => { setEditingTicket(null); setIsModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all active:scale-95">
+          <PlusCircle size={20} /> Nova Tarefa
         </button>
+      </div>
+
+      {/* PESQUISA */}
+      <div className="max-w-6xl mx-auto mb-6 relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <input type="text" placeholder="Pesquisar por assunto ou executor..." className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500" onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       {/* LISTA */}
@@ -144,9 +158,18 @@ export default function App() {
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 border-b">
               <tr>
-                <th className="p-4 text-xs font-bold text-gray-400 uppercase">Tarefa</th>
-                <th className="p-4 text-xs font-bold text-gray-400 uppercase">Prioridade</th>
-                <th className="p-4 text-xs font-bold text-gray-400 uppercase text-center">Status</th>
+                <th onClick={() => requestSort('subject')} className="p-4 text-xs font-bold text-gray-400 uppercase cursor-pointer hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-1">Tarefa <ArrowUpDown size={14}/></div>
+                </th>
+                <th onClick={() => requestSort('priority')} className="p-4 text-xs font-bold text-gray-400 uppercase cursor-pointer hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-1">Prioridade <ArrowUpDown size={14}/></div>
+                </th>
+                <th onClick={() => requestSort('status')} className="p-4 text-xs font-bold text-gray-400 uppercase cursor-pointer hover:text-blue-600 transition-colors text-center">
+                  <div className="flex items-center justify-center gap-1">Status <ArrowUpDown size={14}/></div>
+                </th>
+                <th onClick={() => requestSort('createdOn')} className="p-4 text-xs font-bold text-gray-400 uppercase cursor-pointer hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-1">Data <ArrowUpDown size={14}/></div>
+                </th>
                 <th className="p-4 text-xs font-bold text-gray-400 uppercase text-right">Ações</th>
               </tr>
             </thead>
@@ -156,7 +179,7 @@ export default function App() {
                   <tr className={`transition-colors ${expandedRow === ticket.id ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}>
                     <td className="p-4">
                       <div className="font-bold text-gray-800">{ticket.subject}</div>
-                      <div className="text-xs text-gray-400">#{ticket.id} • {ticket.type}</div>
+                      <div className="text-[10px] text-blue-600 font-bold uppercase">Executor: {ticket.assignedTo || 'Pendente'}</div>
                     </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
@@ -168,38 +191,38 @@ export default function App() {
                         {ticket.status}
                       </button>
                     </td>
+                    <td className="p-4 text-sm text-gray-500">{ticket.createdOn}</td>
                     <td className="p-4 text-right space-x-2">
-                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500">
                         {expandedRow === ticket.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </button>
-                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors">
+                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600">
                         <Edit3 size={18} />
                       </button>
-                      {/* BOTÃO DE APAGAR */}
-                      <button onClick={() => handleDeleteTicket(ticket.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors">
+                      <button onClick={() => handleDeleteTicket(ticket.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600">
                         <Trash2 size={18} />
                       </button>
                     </td>
                   </tr>
-
                   {expandedRow === ticket.id && (
                     <tr className="bg-gray-50/80">
-                      <td colSpan="4" className="p-6 text-sm">
+                      <td colSpan="5" className="p-6 text-sm">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div className="md:col-span-2">
                             <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-2 tracking-widest">Descrição Completa</h4>
-                            <p className="text-gray-700 leading-relaxed bg-white p-4 rounded-xl border border-gray-100 shadow-sm">{ticket.description || 'Sem descrição detalhada.'}</p>
+                            <p className="text-gray-700 leading-relaxed bg-white p-4 rounded-xl border border-gray-100 shadow-sm">{ticket.description || 'Sem descrição.'}</p>
                           </div>
                           <div className="space-y-4">
-                            <div>
-                              <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-1">Informações Adicionais</h4>
-                              <p className="flex items-center gap-2 text-gray-600"><Calendar size={14}/> Criado em: {ticket.createdOn}</p>
-                              <p className="flex items-center gap-2 text-gray-600 mt-1"><Calendar size={14}/> Previsão de Conclusão: {ticket.endDate || 'N/A'}</p>
+                            <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                              <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-2 border-b pb-1">Atribuição</h4>
+                              <p className="flex items-center gap-2 text-gray-600 text-xs mb-2">
+                                <User size={14} className="text-gray-400"/> <b>Solicitante:</b> {ticket.userEmail}
+                              </p>
+                              <p className="flex items-center gap-2 text-blue-700 text-xs font-bold">
+                                <UserCheck size={14} className="text-blue-500"/> <b>Executor:</b> {ticket.assignedTo}
+                              </p>
                             </div>
-                            <div>
-                              <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-1">Responsável</h4>
-                              <p className="text-blue-600 font-medium">{ticket.userEmail || 'Não atribuído'}</p>
-                            </div>
+                            <p className="flex items-center gap-2 text-gray-600 text-xs"><Clock size={14}/> Previsão: {ticket.endDate || 'N/A'}</p>
                           </div>
                         </div>
                       </td>
@@ -215,14 +238,31 @@ export default function App() {
       {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-8 animate-in zoom-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-8 animate-in zoom-in duration-200 text-left">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">{editingTicket ? 'Editar Tarefa' : 'Novo Ticket'}</h2>
+              <h2 className="text-2xl font-bold">{editingTicket ? 'Editar Tarefa' : 'Nova Tarefa'}</h2>
               <button onClick={() => setIsModalOpen(false)}><X className="text-gray-400" /></button>
             </div>
             <form onSubmit={handleSaveTicket} className="space-y-4">
               <input name="subject" defaultValue={editingTicket?.subject} required className="w-full bg-gray-50 border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Assunto" />
               <textarea name="description" defaultValue={editingTicket?.description} rows="3" className="w-full bg-gray-50 border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Descrição detalhada..." />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Quem solicita</label>
+                  <select name="userEmail" defaultValue={editingTicket?.userEmail || "jcgomes@salesgroup.pt"} className="w-full bg-gray-50 border rounded-xl p-3 text-sm">
+                    {TEAM_EMAILS.map(email => <option key={email} value={email}>{email}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-blue-600 uppercase ml-1">Quem executa</label>
+                  <select name="assignedTo" defaultValue={editingTicket?.assignedTo} required className="w-full bg-blue-50 border-blue-200 border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="">Escolher...</option>
+                    {TEAM_EMAILS.map(email => <option key={email} value={email}>{email}</option>)}
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <select name="type" defaultValue={editingTicket?.type} className="bg-gray-50 border rounded-xl p-3 text-sm">
                   <option>Segurança e Compliance</option><option>Comercial</option><option>ASP</option><option>Data Sales</option><option>Pessoal</option><option>DAF</option>
@@ -231,12 +271,9 @@ export default function App() {
                   <option>Baixa</option><option>Alta</option><option>Crítica</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <input name="endDate" type="date" defaultValue={editingTicket?.endDate} className="bg-gray-50 border rounded-xl p-3 text-sm" />
-                <input name="userEmail" type="email" defaultValue={editingTicket?.userEmail} className="bg-gray-50 border rounded-xl p-3 text-sm" placeholder="Email do requerente" />
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">
-                <Save size={20} /> {editingTicket ? 'Guardar Alterações' : 'Criar Ticket'}
+              <input name="endDate" type="date" defaultValue={editingTicket?.endDate} className="w-full bg-gray-50 border rounded-xl p-3 text-sm" />
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2">
+                <Save size={20} /> Guardar Tarefa
               </button>
             </form>
           </div>
