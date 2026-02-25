@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient'; 
-import { PlusCircle, Search, X, Send, Calendar, Tag, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { 
+  PlusCircle, Search, X, Send, Calendar, Tag, 
+  AlertCircle, CheckCircle2, Clock, ChevronDown, 
+  ChevronUp, Edit3, Save 
+} from 'lucide-react';
 
 export default function App() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  // --- ESTADOS ---
   const [tickets, setTickets] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState(null); // Estado para edição
+  const [expandedRow, setExpandedRow] = useState(null); // Estado para a segunda linha
+  const [searchTerm, setSearchTerm] = useState('');
 
+  // --- LEITURA (FETCH) ---
   const fetchTickets = async () => {
     setLoading(true);
     try {
@@ -26,9 +34,9 @@ export default function App() {
         type: t.Type,
         status: t.Status,
         endDate: t["End Date"],
-        createdOn: t["Created On"]
+        createdOn: t["Created On"],
+        userEmail: t["User Email"]
       }));
-      
       setTickets(ticketsFormatados);
     } catch (error) {
       console.error('Erro ao carregar:', error.message);
@@ -37,48 +45,50 @@ export default function App() {
     }
   };
 
-  // --- NOVA FUNÇÃO: ALTERNAR STATUS ---
-  const toggleStatus = async (id, currentStatus) => {
-    const nextStatus = currentStatus === 'Aberto' ? 'Resolvido' : 'Aberto';
-    
-    const { error } = await supabase
-      .from('tickets')
-      .update({ Status: nextStatus })
-      .eq('id', id);
+  useEffect(() => { fetchTickets(); }, []);
 
-    if (error) {
-      alert("Erro ao atualizar status: " + error.message);
-    } else {
-      // Atualiza apenas o ticket alterado no estado para ser mais rápido
-      setTickets(tickets.map(t => t.id === id ? { ...t, status: nextStatus } : t));
-    }
-  };
-
-  useEffect(() => {
-    fetchTickets();
-  }, []);
-
-  const handleAddTicket = async (e) => {
+  // --- CRIAR OU EDITAR (UPSERT) ---
+  const handleSaveTicket = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
-    const novoTicketParaEnviar = {
+    const ticketData = {
       "Title": formData.get('subject'),
       "Description": formData.get('description'),
       "Priority": formData.get('priority'),
       "Type": formData.get('type'),
-      "Status": 'Aberto',
       "End Date": formData.get('endDate'),
-      "Created On": new Date().toISOString().split('T')[0]
+      "User Email": formData.get('userEmail'),
+      "Status": editingTicket ? editingTicket.status : 'Aberto',
+      "Created On": editingTicket ? editingTicket.createdOn : new Date().toISOString().split('T')[0]
     };
 
-    const { error } = await supabase.from('tickets').insert([novoTicketParaEnviar]);
+    let error;
+    if (editingTicket) {
+      // ATUALIZAR
+      const result = await supabase.from('tickets').update(ticketData).eq('id', editingTicket.id);
+      error = result.error;
+    } else {
+      // INSERT NOVO
+      const result = await supabase.from('tickets').insert([ticketData]);
+      error = result.error;
+    }
 
     if (error) {
-      alert("Erro: " + error.message);
+      alert("Erro ao gravar: " + error.message);
     } else {
       setIsModalOpen(false);
+      setEditingTicket(null);
       fetchTickets();
+    }
+  };
+
+  // --- ALTERNAR STATUS RÁPIDO ---
+  const toggleStatus = async (id, currentStatus) => {
+    const nextStatus = currentStatus === 'Aberto' ? 'Resolvido' : 'Aberto';
+    const { error } = await supabase.from('tickets').update({ Status: nextStatus }).eq('id', id);
+    if (!error) {
+      setTickets(tickets.map(t => t.id === id ? { ...t, status: nextStatus } : t));
     }
   };
 
@@ -90,93 +100,122 @@ export default function App() {
     }
   };
 
-  const filteredTickets = tickets.filter(t => 
-    t.subject?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTickets = tickets.filter(t => t.subject?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900">
       {/* HEADER */}
       <div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Suporte Central</h1>
-          <p className="text-gray-500">Gestão Dinâmica de Status</p>
+          <h1 className="text-3xl font-bold tracking-tight">Suporte Central</h1>
+          <p className="text-gray-500">Gestão completa de incidentes</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg">
+        <button 
+          onClick={() => { setEditingTicket(null); setIsModalOpen(true); }}
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg"
+        >
           <PlusCircle size={20} /> Novo Ticket
         </button>
       </div>
 
       {/* LISTA */}
       <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-20 text-center">A carregar...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="p-4 text-xs font-bold text-gray-400 uppercase">ID</th>
-                  <th className="p-4 text-xs font-bold text-gray-400 uppercase">Assunto</th>
-                  <th className="p-4 text-xs font-bold text-gray-400 uppercase">Prioridade</th>
-                  <th className="p-4 text-xs font-bold text-gray-400 uppercase text-center">Status (Clique)</th>
-                  <th className="p-4 text-xs font-bold text-gray-400 uppercase">Previsão</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredTickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-gray-50">
-                    <td className="p-4 font-bold text-blue-600">#{ticket.id}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50/50 border-b">
+              <tr>
+                <th className="p-4 text-xs font-bold text-gray-400 uppercase">Ticket</th>
+                <th className="p-4 text-xs font-bold text-gray-400 uppercase">Prioridade</th>
+                <th className="p-4 text-xs font-bold text-gray-400 uppercase text-center">Status</th>
+                <th className="p-4 text-xs font-bold text-gray-400 uppercase text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredTickets.map((ticket) => (
+                <React.Fragment key={ticket.id}>
+                  {/* LINHA PRINCIPAL */}
+                  <tr className={`transition-colors ${expandedRow === ticket.id ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}>
                     <td className="p-4">
-                      <div className="font-semibold text-gray-800">{ticket.subject}</div>
-                      <div className="text-xs text-gray-400 flex items-center gap-1"><Tag size={12} /> {ticket.type}</div>
+                      <div className="font-bold text-gray-800">{ticket.subject}</div>
+                      <div className="text-xs text-gray-400">#{ticket.id} • {ticket.type}</div>
                     </td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
                         {ticket.priority}
                       </span>
                     </td>
-                    <td className="p-4">
-                       <button 
-                         onClick={() => toggleStatus(ticket.id, ticket.status)}
-                         className={`mx-auto flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
-                           ticket.status === 'Resolvido' 
-                           ? 'bg-green-50 border-green-200 text-green-700' 
-                           : 'bg-amber-50 border-amber-200 text-amber-700'
-                         }`}
-                       >
-                         {ticket.status === 'Resolvido' ? <CheckCircle2 size={16} /> : <Clock size={16} />}
-                         {ticket.status}
-                       </button>
+                    <td className="p-4 text-center">
+                      <button onClick={() => toggleStatus(ticket.id, ticket.status)} className={`px-3 py-1 rounded-full text-xs font-bold border ${ticket.status === 'Resolvido' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                        {ticket.status}
+                      </button>
                     </td>
-                    <td className="p-4 text-sm text-gray-400 font-medium">
-                      {ticket.endDate || 'S/ Data'}
+                    <td className="p-4 text-right space-x-2">
+                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500">
+                        {expandedRow === ticket.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600">
+                        <Edit3 size={18} />
+                      </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+
+                  {/* SEGUNDA LINHA (EXPANDIDA) */}
+                  {expandedRow === ticket.id && (
+                    <tr className="bg-gray-50/80">
+                      <td colSpan="4" className="p-6 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="md:col-span-2">
+                            <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-2 tracking-widest">Descrição Completa</h4>
+                            <p className="text-gray-700 leading-relaxed bg-white p-4 rounded-xl border border-gray-100 shadow-sm">{ticket.description || 'Sem descrição detalhada.'}</p>
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-1">Informações Adicionais</h4>
+                              <p className="flex items-center gap-2 text-gray-600"><Calendar size={14}/> Criado em: {ticket.createdOn}</p>
+                              <p className="flex items-center gap-2 text-gray-600 mt-1"><Calendar size={14}/> Previsão: {ticket.endDate || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-gray-400 uppercase text-[10px] mb-1">Contacto</h4>
+                              <p className="text-blue-600 font-medium">{ticket.userEmail || 'Não atribuído'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* MODAL (Mantido igual ao anterior) */}
+      {/* MODAL (CRIAÇÃO E EDIÇÃO) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Novo Ticket</h2>
-              <button onClick={() => setIsModalOpen(false)}><X /></button>
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-8 animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">{editingTicket ? 'Editar Ticket' : 'Novo Ticket'}</h2>
+              <button onClick={() => setIsModalOpen(false)}><X className="text-gray-400" /></button>
             </div>
-            <form onSubmit={handleAddTicket} className="space-y-4">
-              <input name="subject" required className="w-full border rounded-lg p-2" placeholder="Assunto" />
-              <textarea name="description" className="w-full border rounded-lg p-2" placeholder="Descrição" />
+            <form onSubmit={handleSaveTicket} className="space-y-4">
+              <input name="subject" defaultValue={editingTicket?.subject} required className="w-full bg-gray-50 border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Assunto" />
+              <textarea name="description" defaultValue={editingTicket?.description} rows="3" className="w-full bg-gray-50 border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Descrição detalhada..." />
               <div className="grid grid-cols-2 gap-4">
-                <select name="type" className="border rounded-lg p-2"><option>Suporte</option><option>Manutenção</option></select>
-                <select name="priority" className="border rounded-lg p-2"><option>Baixa</option><option>Alta</option><option>Crítica</option></select>
+                <select name="type" defaultValue={editingTicket?.type} className="bg-gray-50 border rounded-xl p-3 text-sm">
+                  <option>Suporte</option><option>Manutenção</option><option>Financeiro</option>
+                </select>
+                <select name="priority" defaultValue={editingTicket?.priority} className="bg-gray-50 border rounded-xl p-3 text-sm">
+                  <option>Baixa</option><option>Alta</option><option>Crítica</option>
+                </select>
               </div>
-              <input name="endDate" type="date" className="w-full border rounded-lg p-2" />
-              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Criar Ticket</button>
+              <div className="grid grid-cols-2 gap-4">
+                <input name="endDate" type="date" defaultValue={editingTicket?.endDate} className="bg-gray-50 border rounded-xl p-3 text-sm" />
+                <input name="userEmail" type="email" defaultValue={editingTicket?.userEmail} className="bg-gray-50 border rounded-xl p-3 text-sm" placeholder="Email do requerente" />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2">
+                <Save size={20} /> {editingTicket ? 'Guardar Alterações' : 'Criar Ticket'}
+              </button>
             </form>
           </div>
         </div>
