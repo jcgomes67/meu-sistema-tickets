@@ -3,20 +3,20 @@ import { supabase } from './supabaseClient';
 import { 
   PlusCircle, Search, X, Calendar, Edit3, Save, Trash2, 
   ArrowUpDown, UserCheck, User, Clock, ChevronDown, ChevronUp,
-  EyeOff, Eye, Download, FileText, Layers, Hash, LogOut, Lock
+  EyeOff, Eye, Download, FileText, Layers, Hash
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// --- CONFIGURAÇÃO ---
+// --- CONFIGURAÇÃO DA EQUIPA ---
 const TEAM_EMAILS = [
   "jcgomes@salesgroup.pt", "cmendes@salesgroup.pt", "cchau@salesgroup.pt", 
   "vsilva@salesgrouop.pt", "pbacalhau@salesgroup.pt"
 ];
 
+// --- OPÇÕES DE SETOR ---
 const SECTORS = ["ASP","Comercial", "DAF","Data Sales","Segurança e Compliance", "Pessoal", "Outros"];
 
 export default function App() {
-  const [session, setSession] = useState(null);
   const [tickets, setTickets] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,50 +24,18 @@ export default function App() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showHidden, setShowHidden] = useState(false);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
   
   const [columnFilters, setColumnFilters] = useState({
-    id: '', type: '', subject: '', priority: '', status: '', assignedTo: ''
+    id: '', // Novo filtro ID
+    type: '',
+    subject: '',
+    priority: '',
+    status: '',
+    assignedTo: ''
   });
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
 
-  // --- CONTROLO DE SESSÃO ---
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (session) fetchTickets();
-  }, [session]);
-
-  // --- FUNÇÕES DE AUTH ---
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: authEmail,
-      password: authPassword,
-    });
-    if (error) alert("Erro no login: " + error.message);
-    setLoading(false);
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setTickets([]);
-  };
-
-  // --- LÓGICA DE TICKETS ---
   const fetchTickets = async () => {
     setLoading(true);
     try {
@@ -89,6 +57,8 @@ export default function App() {
     } catch (error) { console.error('Erro:', error.message); } 
     finally { setLoading(false); }
   };
+
+  useEffect(() => { fetchTickets(); }, []);
 
   const getPriorityColor = (prio) => {
     switch (prio) {
@@ -183,54 +153,6 @@ export default function App() {
     return result;
   }, [tickets, sortConfig, searchTerm, columnFilters, showHidden]);
 
-  // --- VISTA DE LOGIN ---
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6 font-sans">
-        <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 animate-in fade-in zoom-in duration-300">
-          <div className="flex justify-center mb-8">
-            <div className="bg-blue-50 p-4 rounded-2xl">
-              <Lock className="text-blue-600" size={32} />
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold text-center text-gray-800 mb-2">Acesso Restrito</h2>
-          <p className="text-gray-500 text-center mb-8 text-sm">Insira as suas credenciais para gerir os pendentes.</p>
-          
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">E-mail</label>
-              <input 
-                type="email" 
-                required 
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                placeholder="exemplo@salesgroup.pt"
-                onChange={(e) => setAuthEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Password</label>
-              <input 
-                type="password" 
-                required 
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                placeholder="••••••••"
-                onChange={(e) => setAuthPassword(e.target.value)}
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
-            >
-              {loading ? "A processar..." : "Entrar no Sistema"}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // --- VISTA DO DASHBOARD ---
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-900 text-left">
       {/* HEADER */}
@@ -241,15 +163,12 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-3xl font-bold">Gestão de Pendentes</h1>
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-               <User size={12}/> <span>{session.user.email}</span>
-            </div>
+            <p className="text-grey-600 font-normal text-sm tracking-wider">Tarefas: João Costa Gomes</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={exportToExcel} className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95"><Download size={18} /> Excel</button>
           <button onClick={() => { setEditingTicket(null); setIsModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95"><PlusCircle size={20} /> Nova</button>
-          <button onClick={handleLogout} className="bg-white border border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-bold flex items-center gap-2 shadow-sm hover:bg-gray-50 transition-all"><LogOut size={18} /> Sair</button>
         </div>
       </div>
 
@@ -270,10 +189,12 @@ export default function App() {
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50/50 border-b">
               <tr>
+                {/* COLUNA ID */}
                 <th className="p-4 w-20">
                   <div onClick={() => requestSort('id')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2 hover:text-blue-600">ID <ArrowUpDown size={12}/></div>
                   <input type="text" placeholder="#" className="w-full p-1 text-xs border rounded outline-none" onChange={e => setColumnFilters({...columnFilters, id: e.target.value})} />
                 </th>
+                {/* COLUNA SETOR */}
                 <th className="p-4 w-40">
                   <div onClick={() => requestSort('type')} className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer flex items-center gap-1 mb-2 hover:text-blue-600">Setor <ArrowUpDown size={12}/></div>
                   <select className="w-full p-1 text-xs border rounded outline-none" onChange={e => setColumnFilters({...columnFilters, type: e.target.value})}>
@@ -304,16 +225,25 @@ export default function App() {
               {filteredTickets.map((ticket) => (
                 <React.Fragment key={ticket.id}>
                   <tr className={`transition-colors ${ticket.hidden ? 'opacity-50 grayscale bg-gray-50' : ''} ${expandedRow === ticket.id ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}>
-                    <td className="p-4 text-xs font-mono font-bold text-gray-400">#{ticket.id}</td>
+                    {/* VALOR ID */}
+                    <td className="p-4 text-xs font-mono font-bold text-gray-400">
+                      #{ticket.id}
+                    </td>
+                    {/* VALOR SETOR */}
                     <td className="p-4 text-xs font-bold text-gray-500 uppercase tracking-tighter">
-                      <div className="flex items-center gap-1.5"><Layers size={12} className="text-gray-300"/>{ticket.type}</div>
+                      <div className="flex items-center gap-1.5">
+                        <Layers size={12} className="text-gray-300"/>
+                        {ticket.type}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="font-bold text-gray-800">{ticket.subject}</div>
                       <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Criado: {ticket.createdOn} | Executor: {ticket.assignedTo?.split('@')[0]}</div>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span>
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
+                        {ticket.priority}
+                      </span>
                     </td>
                     <td className="p-4 text-center">
                       <button onClick={() => toggleStatus(ticket.id, ticket.status)} className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${ticket.status === 'Resolvido' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200' : 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'}`}>
@@ -321,12 +251,22 @@ export default function App() {
                       </button>
                     </td>
                     <td className="p-4 text-right space-x-1 whitespace-nowrap">
-                      <button onClick={() => toggleHideTicket(ticket.id, ticket.hidden)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400">{ticket.hidden ? <Eye size={16} /> : <EyeOff size={16} />}</button>
-                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500">{expandedRow === ticket.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
-                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600"><Edit3 size={16} /></button>
-                      <button onClick={() => handleDeleteTicket(ticket.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600"><Trash2 size={16} /></button>
+                      <button onClick={() => toggleHideTicket(ticket.id, ticket.hidden)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400">
+                        {ticket.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
+                      </button>
+                      <button onClick={() => setExpandedRow(expandedRow === ticket.id ? null : ticket.id)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500">
+                        {expandedRow === ticket.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      <button onClick={() => { setEditingTicket(ticket); setIsModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded-lg text-blue-600">
+                        <Edit3 size={16} />
+                      </button>
+                      <button onClick={() => handleDeleteTicket(ticket.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600">
+                        <Trash2 size={16} />
+                      </button>
                     </td>
                   </tr>
+                  
+                  {/* EXPANSÃO DETALHADA */}
                   {expandedRow === ticket.id && (
                     <tr className="bg-gray-50/80">
                       <td colSpan="6" className="p-6">
@@ -356,7 +296,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* MODAL (FORMULÁRIO) */}
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-8 animate-in zoom-in duration-200">
@@ -376,7 +316,7 @@ export default function App() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Solicitante</label>
-                  <select name="userEmail" defaultValue={editingTicket?.userEmail || session.user.email} className="w-full bg-gray-50 border rounded-xl p-3 text-sm">
+                  <select name="userEmail" defaultValue={editingTicket?.userEmail || "jcgomes@salesgroup.pt"} className="w-full bg-gray-50 border rounded-xl p-3 text-sm">
                     {TEAM_EMAILS.map(email => <option key={email} value={email}>{email}</option>)}
                   </select>
                 </div>
