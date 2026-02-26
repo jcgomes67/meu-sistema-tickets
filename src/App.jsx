@@ -52,20 +52,33 @@ export default function App() {
 
   // --- FUNÇÕES DE AUTH ---
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: authEmail,
-      password: authPassword,
-    });
-    if (error) alert("Erro no login: " + error.message);
-    setLoading(false);
-  };
+  e.preventDefault();
+  setLoading(true); // O botão passa a "A processar..."
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setTickets([]);
-  };
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      // Se o Supabase responder com erro (ex: password errada)
+      console.error("Erro do Supabase:", error.message);
+      alert("Erro: " + error.message);
+    } else {
+      console.log("Login com sucesso!", data);
+      // Redirecionar para os tickets aqui
+    }
+  } catch (err) {
+    // Se houver um erro de ligação ou código
+    console.error("Erro inesperado:", err);
+    alert("Ocorreu um erro inesperado. Verifique a consola (F12).");
+  } finally {
+    // ESTA LINHA É A MAIS IMPORTANTE
+    // Ela garante que o botão volta ao normal, quer corra bem ou mal
+    setLoading(false); 
+  }
+};
 
   // --- LÓGICA DE TICKETS ---
   const fetchTickets = async () => {
