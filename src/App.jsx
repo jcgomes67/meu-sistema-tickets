@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 // --- CONFIGURAÇÃO ---
 const TEAM_EMAILS = [
   "jcgomes@salesgroup.pt", "cmendes@salesgroup.pt", "cchau@salesgroup.pt", 
-  "vsilva@salesgrouop.pt", "pbacalhau@salesgroup.pt"
+  "vsilva@salesgrouop.pt", "pbacalhau@digitalsales.pt","pvgodinho@salesgroup.pt"
 ];
 
 const SECTORS = ["ASP","Comercial", "DAF","Data Sales","Segurança e Compliance", "Pessoal", "Outros"];
