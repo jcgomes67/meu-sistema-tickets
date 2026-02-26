@@ -24,8 +24,6 @@ export default function App() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showHidden, setShowHidden] = useState(false);
-  
-  // Variáveis de estado para o formulário de login
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   
@@ -39,7 +37,6 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -55,34 +52,33 @@ export default function App() {
 
   // --- FUNÇÕES DE AUTH ---
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true); // O botão passa a "A processar..."
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
-        password: authPassword,
-      });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
 
-      if (error) {
-        console.error("Erro do Supabase:", error.message);
-        alert("Erro no login: " + error.message);
-      } else {
-        console.log("Login com sucesso!", data);
-        setSession(data.session);
-      }
-    } catch (err) {
-      console.error("Erro inesperado:", err);
-      alert("Ocorreu um erro inesperado. Verifique a ligação.");
-    } finally {
-      setLoading(false); 
+    if (error) {
+      // Se o Supabase responder com erro (ex: password errada)
+      console.error("Erro do Supabase:", error.message);
+      alert("Erro: " + error.message);
+    } else {
+      console.log("Login com sucesso!", data);
+      // Redirecionar para os tickets aqui
     }
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-  };
+  } catch (err) {
+    // Se houver um erro de ligação ou código
+    console.error("Erro inesperado:", err);
+    alert("Ocorreu um erro inesperado. Verifique a consola (F12).");
+  } finally {
+    // ESTA LINHA É A MAIS IMPORTANTE
+    // Ela garante que o botão volta ao normal, quer corra bem ou mal
+    setLoading(false); 
+  }
+};
 
   // --- LÓGICA DE TICKETS ---
   const fetchTickets = async () => {
@@ -103,11 +99,8 @@ export default function App() {
         assignedTo: t["Assigned To"],
         hidden: t.hidden || false 
       })));
-    } catch (error) { 
-      console.error('Erro:', error.message); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (error) { console.error('Erro:', error.message); } 
+    finally { setLoading(false); }
   };
 
   const getPriorityColor = (prio) => {
@@ -218,30 +211,22 @@ export default function App() {
           
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label htmlFor="email" className="text-[10px] font-bold text-gray-400 uppercase ml-1">E-mail</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">E-mail</label>
               <input 
-                id="email"
-                name="email"
                 type="email" 
                 required 
-                autoComplete="email"
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 placeholder="exemplo@salesgroup.pt"
-                value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="text-[10px] font-bold text-gray-400 uppercase ml-1">Password</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Password</label>
               <input 
-                id="password"
-                name="password"
                 type="password" 
                 required 
-                autoComplete="current-password"
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 placeholder="••••••••"
-                value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
               />
             </div>
