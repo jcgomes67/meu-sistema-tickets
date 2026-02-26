@@ -68,6 +68,7 @@ export default function App() {
         console.error("Erro do Supabase:", error.message);
         alert("Erro no login: " + error.message);
       } else {
+        console.log("Login com sucesso!", data);
         setSession(data.session);
       }
     } catch (err) {
@@ -176,22 +177,9 @@ export default function App() {
     setSortConfig({ key, direction });
   };
 
-  // --- LÓGICA DE FILTRAGEM E PRIVACIDADE ---
   const filteredTickets = useMemo(() => {
     let result = [...tickets];
-
-    // 1. Restrição por Utilizador Logado (Privacidade)
-    if (session?.user?.email) {
-      result = result.filter(t => 
-        t.userEmail === session.user.email || 
-        t.assignedTo === session.user.email
-      );
-    }
-
-    // 2. Filtro de Arquivados
     if (!showHidden) result = result.filter(t => !t.hidden);
-
-    // 3. Pesquisa Geral
     if (searchTerm) {
       result = result.filter(t => 
         t.id?.toString().includes(searchTerm) ||
@@ -200,15 +188,11 @@ export default function App() {
         t.type?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-
-    // 4. Filtros por Coluna
     Object.keys(columnFilters).forEach(key => {
       if (columnFilters[key]) {
         result = result.filter(t => t[key]?.toString().toLowerCase().includes(columnFilters[key].toLowerCase()));
       }
     });
-
-    // 5. Ordenação
     if (sortConfig.key) {
       result.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -217,7 +201,7 @@ export default function App() {
       });
     }
     return result;
-  }, [tickets, sortConfig, searchTerm, columnFilters, showHidden, session]);
+  }, [tickets, sortConfig, searchTerm, columnFilters, showHidden]);
 
   // --- VISTA DE LOGIN ---
   if (!session) {
